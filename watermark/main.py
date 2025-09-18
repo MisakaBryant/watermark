@@ -23,12 +23,43 @@ def scan_images(path: str) -> List[str]:
                     files.append(os.path.join(root, f))
     return files
 
+from watermark.exif_util import get_exif_date
+from watermark.watermark_util import add_watermark
+
+def save_watermarked_image(src_path: str, img, out_dir: str):
+    rel_path = os.path.relpath(src_path, start=os.path.commonpath([src_path, out_dir, os.getcwd()]))
+    out_path = os.path.join(out_dir, os.path.basename(src_path))
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    img.save(out_path)
+    return out_path
+
 def main():
     args = parse_args()
     images = scan_images(args.path)
     print(f"共找到 {len(images)} 张图片：")
-    for img in images:
-        print(img)
+    if not images:
+        print("未找到图片文件。")
+        return
+    # 输出目录
+    if os.path.isfile(args.path):
+        base_dir = os.path.dirname(args.path)
+    else:
+        base_dir = args.path
+    out_dir = base_dir.rstrip(os.sep) + "_watermark"
+    os.makedirs(out_dir, exist_ok=True)
+    for img_path in images:
+        date = get_exif_date(img_path)
+        if not date:
+            print(f"跳过无exif日期的图片: {img_path}")
+            continue
+        watermarked = add_watermark(
+            img_path, date,
+            font_size=args.font_size,
+            color=args.color,
+            position=args.position
+        )
+        out_path = save_watermarked_image(img_path, watermarked, out_dir)
+        print(f"已保存: {out_path}")
 
 if __name__ == "__main__":
     main()
