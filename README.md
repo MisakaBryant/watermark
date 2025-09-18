@@ -15,7 +15,7 @@ pip install pillow piexif
 
 ## 使用方法
 ```bash
-python main.py <图片或目录路径> [--font-size 32] [--color "#FFFFFF"] [--position right_bottom]
+python -m watermark.main <图片或目录路径> [--font-size 32] [--color "#FFFFFF"] [--position right_bottom]
 ```
 
 - `--font-size`：字体大小，默认32
@@ -24,7 +24,7 @@ python main.py <图片或目录路径> [--font-size 32] [--color "#FFFFFF"] [--p
 
 ## 示例
 ```bash
-python main.py ./photos --font-size 40 --color "#FF0000" --position center
+python -m watermark.main ./photos --font-size 40 --color "#FF0000" --position center
 ```
 
 ## 测试

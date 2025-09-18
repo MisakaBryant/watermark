@@ -27,7 +27,7 @@ from watermark.exif_util import get_exif_date
 from watermark.watermark_util import add_watermark
 
 def save_watermarked_image(src_path: str, img, out_dir: str):
-    rel_path = os.path.relpath(src_path, start=os.path.commonpath([src_path, out_dir, os.getcwd()]))
+    # 直接用原图文件名，或可选：保持原目录结构
     out_path = os.path.join(out_dir, os.path.basename(src_path))
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     img.save(out_path)

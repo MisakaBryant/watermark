@@ -1,4 +1,11 @@
-# Byte-compiled / optimized / DLL files
+# 忽略水印输出目录和图片目录
+*_watermark/
+photos/
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.tiff# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
 *$py.class
