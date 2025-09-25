@@ -23,36 +23,92 @@ class WatermarkMainWindow(QMainWindow):
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
 
+
         # 左侧：图片列表
         left_layout = QVBoxLayout()
+        self.list_widget = QListWidget()
+        self.list_widget.setIconSize(Qt.QSize(100, 100))
+        self.list_widget.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.list_widget.itemSelectionChanged.connect(self.on_image_selected)
+        left_layout.addWidget(QLabel("已导入图片："))
+        left_layout.addWidget(self.list_widget)
 
-    self.list_widget = QListWidget()
-    self.list_widget.setIconSize(Qt.QSize(100, 100))
-    self.list_widget.setSelectionMode(QAbstractItemView.ExtendedSelection)
-    self.list_widget.itemSelectionChanged.connect(self.on_image_selected)
-    left_layout.addWidget(QLabel("已导入图片："))
-    left_layout.addWidget(self.list_widget)
-
-    btn_layout = QHBoxLayout()
-    btn_import = QPushButton("导入图片")
-    btn_import.clicked.connect(self.import_images)
-    btn_folder = QPushButton("导入文件夹")
-    btn_folder.clicked.connect(self.import_folder)
-    btn_delete = QPushButton("删除选中")
-    btn_delete.clicked.connect(self.delete_selected)
-    btn_layout.addWidget(btn_import)
-    btn_layout.addWidget(btn_folder)
-    btn_layout.addWidget(btn_delete)
-    left_layout.addLayout(btn_layout)
+        btn_layout = QHBoxLayout()
+        btn_import = QPushButton("导入图片")
+        btn_import.clicked.connect(self.import_images)
+        btn_folder = QPushButton("导入文件夹")
+        btn_folder.clicked.connect(self.import_folder)
+        btn_delete = QPushButton("删除选中")
+        btn_delete.clicked.connect(self.delete_selected)
+        btn_layout.addWidget(btn_import)
+        btn_layout.addWidget(btn_folder)
+        btn_layout.addWidget(btn_delete)
+        left_layout.addLayout(btn_layout)
 
         main_layout.addLayout(left_layout, 2)
 
-        # 右侧：预览区（预留）
-        right_layout = QVBoxLayout()
-        self.preview_label = QLabel("预览区")
-        self.preview_label.setAlignment(Qt.AlignCenter)
-        right_layout.addWidget(self.preview_label)
-        main_layout.addLayout(right_layout, 5)
+
+    # 右侧：预览区 + 水印参数设置
+    right_layout = QVBoxLayout()
+    self.preview_label = QLabel("预览区")
+    self.preview_label.setAlignment(Qt.AlignCenter)
+    right_layout.addWidget(self.preview_label)
+
+    # 水印参数设置区
+    from PyQt5.QtWidgets import QLineEdit, QSlider, QComboBox, QFormLayout
+    param_layout = QFormLayout()
+    # 文本内容
+    self.text_input = QLineEdit("Watermark")
+    self.text_input.textChanged.connect(self.update_preview)
+    param_layout.addRow("水印文本：", self.text_input)
+    # 透明度
+    self.opacity_slider = QSlider(Qt.Horizontal)
+    self.opacity_slider.setRange(0, 100)
+    self.opacity_slider.setValue(60)
+    self.opacity_slider.valueChanged.connect(self.update_preview)
+    param_layout.addRow("透明度：", self.opacity_slider)
+    # 位置
+    self.position_combo = QComboBox()
+    self.position_combo.addItems(["左上", "居中", "右下"])
+    self.position_combo.currentIndexChanged.connect(self.update_preview)
+    param_layout.addRow("位置：", self.position_combo)
+
+    right_layout.addLayout(param_layout)
+    main_layout.addLayout(right_layout, 5)
+    def get_current_watermark_params(self):
+        text = self.text_input.text()
+        opacity = self.opacity_slider.value()
+        pos_map = {0: "left_top", 1: "center", 2: "right_bottom"}
+        position = pos_map.get(self.position_combo.currentIndex(), "right_bottom")
+        return text, opacity, position
+
+    def update_preview(self):
+        selected = self.list_widget.selectedItems()
+        if not selected:
+            self.preview_label.clear()
+            self.preview_label.setText("预览区")
+            return
+        item = selected[0]
+        img_path = item.data(Qt.UserRole)
+        if not img_path or not os.path.isfile(img_path):
+            self.preview_label.setText("预览区")
+            return
+        # 应用水印
+        from watermark.watermark_util import add_watermark
+        text, opacity, position = self.get_current_watermark_params()
+        try:
+            watermarked = add_watermark(img_path, text, opacity=opacity, position=position)
+            # 转 QPixmap
+            import io
+            buf = io.BytesIO()
+            watermarked.save(buf, format="PNG")
+            buf.seek(0)
+            qimg = QPixmap()
+            qimg.loadFromData(buf.read())
+            scaled = qimg.scaled(600, 600, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self.preview_label.setPixmap(scaled)
+        except Exception as e:
+            self.preview_label.setText(f"预览失败: {e}")
 
         # 支持拖拽导入
         self.setAcceptDrops(True)
@@ -94,23 +150,7 @@ class WatermarkMainWindow(QMainWindow):
             return None
 
     def on_image_selected(self):
-        selected = self.list_widget.selectedItems()
-        if not selected:
-            self.preview_label.clear()
-            self.preview_label.setText("预览区")
-            return
-        # 只预览第一个选中项
-        item = selected[0]
-        img_path = item.data(Qt.UserRole)
-        if img_path and os.path.isfile(img_path):
-            pixmap = QPixmap(img_path)
-            if not pixmap.isNull():
-                scaled = pixmap.scaled(600, 600, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                self.preview_label.setPixmap(scaled)
-            else:
-                self.preview_label.setText("无法加载图片")
-        else:
-            self.preview_label.setText("预览区")
+        self.update_preview()
 
     def delete_selected(self):
         selected = self.list_widget.selectedItems()

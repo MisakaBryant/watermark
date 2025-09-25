@@ -7,8 +7,12 @@ def add_watermark(
     text: str,
     font_size: int = 32,
     color: str = "#FFFFFF",
-    position: str = "right_bottom"
+    position: str = "right_bottom",
+    opacity: int = 60
 ) -> Image.Image:
+    """
+    opacity: 0-100, 100为不透明
+    """
     img = Image.open(image_path).convert("RGBA")
     txt_layer = Image.new("RGBA", img.size, (255,255,255,0))
     draw = ImageDraw.Draw(txt_layer)
@@ -25,6 +29,12 @@ def add_watermark(
         xy = ((img.width - w)//2, (img.height - h)//2)
     else:  # right_bottom
         xy = (img.width - w - 10, img.height - h - 10)
-    draw.text(xy, text, font=font, fill=color)
+    # 透明度处理
+    if color.startswith("#") and len(color) == 7:
+        rgb = tuple(int(color[i:i+2], 16) for i in (1, 3, 5))
+    else:
+        rgb = (255,255,255)
+    fill = rgb + (int(255 * opacity / 100),)
+    draw.text(xy, text, font=font, fill=fill)
     watermarked = Image.alpha_composite(img, txt_layer)
     return watermarked.convert("RGB")
