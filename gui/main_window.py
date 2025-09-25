@@ -12,6 +12,55 @@ import os
 from PIL import Image
 
 class WatermarkMainWindow(QMainWindow):
+    # ...existing code...
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Watermark 批量水印工具")
+        self.setGeometry(200, 200, 1000, 700)
+
+        self.image_list = []  # 存储图片路径
+
+        # 主布局
+        main_widget = QWidget()
+        main_layout = QHBoxLayout()
+        main_widget.setLayout(main_layout)
+        self.setCentralWidget(main_widget)
+
+        # 拖拽相关
+        self.custom_pos = None  # (x, y) 归一化坐标
+        self.dragging = False
+
+        # ...existing code...
+
+        # 右侧：预览区 + 水印参数设置
+        right_layout = QVBoxLayout()
+        self.preview_label = QLabel("预览区")
+        self.preview_label.setAlignment(Qt.AlignCenter)
+        # 拖拽事件绑定
+        self.preview_label.mousePressEvent = self.on_preview_mouse_press
+        self.preview_label.mouseMoveEvent = self.on_preview_mouse_move
+        self.preview_label.mouseReleaseEvent = self.on_preview_mouse_release
+        right_layout.addWidget(self.preview_label)
+    def on_preview_mouse_press(self, event):
+        if event.button() == Qt.LeftButton:
+            self.dragging = True
+            self._drag_start = event.pos()
+
+    def on_preview_mouse_move(self, event):
+        if self.dragging:
+            pos = event.pos()
+            # 计算归一化坐标
+            x = pos.x() / self.preview_label.width()
+            y = pos.y() / self.preview_label.height()
+            self.custom_pos = (x, y)
+            # 切换为“自定义”位置
+            if self.position_combo.findText("自定义") == -1:
+                self.position_combo.addItem("自定义")
+            self.position_combo.setCurrentText("自定义")
+            self.update_preview()
+
+    def on_preview_mouse_release(self, event):
+        self.dragging = False
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Watermark 批量水印工具")
@@ -96,8 +145,14 @@ class WatermarkMainWindow(QMainWindow):
             "左中", "居中", "右中",
             "左下", "下中", "右下"
         ])
-        self.position_combo.currentIndexChanged.connect(self.update_preview)
+        self.position_combo.currentIndexChanged.connect(self.on_position_changed)
         param_layout.addRow("位置：", self.position_combo)
+
+    def on_position_changed(self):
+        # 切换九宫格时清除自定义坐标
+        if self.position_combo.currentText() != "自定义":
+            self.custom_pos = None
+        self.update_preview()
         right_layout.addLayout(param_layout)
 
     def choose_text_color(self):
@@ -349,7 +404,10 @@ class WatermarkMainWindow(QMainWindow):
             3: "left_center", 4: "center", 5: "right_center",
             6: "left_bottom", 7: "bottom_center", 8: "right_bottom"
         }
-        position = pos_map.get(self.position_combo.currentIndex(), "right_bottom")
+        if self.position_combo.currentText() == "自定义" and self.custom_pos:
+            position = ("custom", self.custom_pos)
+        else:
+            position = pos_map.get(self.position_combo.currentIndex(), "right_bottom")
         imgwm = self.imgwm_path.text().strip()
         imgwm_opacity = self.imgwm_opacity.value()
         imgwm_scale = self.imgwm_scale.value()
