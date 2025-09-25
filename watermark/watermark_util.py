@@ -84,6 +84,21 @@ def add_watermark(
     else:
         rgb = (255,255,255)
     fill = rgb + (int(255 * opacity / 100),)
+    # 阴影和描边参数
+    shadow_offset = 2
+    outline_width = 2
+    # 阴影（黑色半透明）
+    shadow_fill = (0, 0, 0, int(255 * opacity / 100 * 0.6))
+    shadow_xy = (xy[0] + shadow_offset, xy[1] + shadow_offset)
+    draw.text(shadow_xy, text, font=font_obj, fill=shadow_fill)
+    # 描边（白色/黑色，自动判断）
+    outline_color = (0, 0, 0, int(255 * opacity / 100)) if sum(fill[:3]) > 400 else (255, 255, 255, int(255 * opacity / 100))
+    for dx in range(-outline_width, outline_width+1):
+        for dy in range(-outline_width, outline_width+1):
+            if dx == 0 and dy == 0:
+                continue
+            draw.text((xy[0]+dx, xy[1]+dy), text, font=font_obj, fill=outline_color)
+    # 正文
     draw.text(xy, text, font=font_obj, fill=fill)
     watermarked = Image.alpha_composite(img, txt_layer)
     return watermarked.convert("RGB")
