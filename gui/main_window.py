@@ -7,11 +7,12 @@ from PyQt5.QtWidgets import (
     , QFontComboBox, QColorDialog, QSpinBox, QCheckBox
 )
 from PyQt5.QtGui import QPixmap, QIcon
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QSize
 import os
 from PIL import Image
 
 class WatermarkMainWindow(QMainWindow):
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Watermark 批量水印工具")
@@ -32,7 +33,7 @@ class WatermarkMainWindow(QMainWindow):
         # 左侧：图片列表
         left_layout = QVBoxLayout()
         self.list_widget = QListWidget()
-        self.list_widget.setIconSize(Qt.QSize(100, 100))
+        self.list_widget.setIconSize(QSize(100, 100))
         self.list_widget.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.list_widget.itemSelectionChanged.connect(self.on_image_selected)
         left_layout.addWidget(QLabel("已导入图片："))
@@ -222,6 +223,9 @@ class WatermarkMainWindow(QMainWindow):
 
         main_layout.addLayout(right_layout, 5)
 
+    def on_image_selected(self):
+        self.update_preview()
+
     def on_preview_mouse_press(self, event):
         if event.button() == Qt.LeftButton:
             self.dragging = True
@@ -248,6 +252,30 @@ class WatermarkMainWindow(QMainWindow):
         if self.position_combo.currentText() != "自定义":
             self.custom_pos = None
         self.update_preview()
+
+    def delete_selected(self):
+        selected = self.list_widget.selectedItems()
+        for item in selected:
+            row = self.list_widget.row(item)
+            self.list_widget.takeItem(row)
+            if item.data(Qt.UserRole) in self.image_list:
+                self.image_list.remove(item.data(Qt.UserRole))
+        self.update_preview()
+
+    def add_images(self, files):
+        for path in files:
+            if path and path not in self.image_list:
+                item = QListWidgetItem(os.path.basename(path))
+                item.setData(Qt.UserRole, path)
+                # 缩略图
+                try:
+                    pixmap = QPixmap(path)
+                    if not pixmap.isNull():
+                        item.setIcon(QIcon(pixmap.scaled(100, 100, Qt.KeepAspectRatio, Qt.SmoothTransformation)))
+                except Exception:
+                    pass
+                self.list_widget.addItem(item)
+                self.image_list.append(path)
 
     def choose_text_color(self):
         color = QColorDialog.getColor()
@@ -304,8 +332,9 @@ class WatermarkMainWindow(QMainWindow):
         if not name or name not in self.templates:
             return
         tpl = self.templates[name]
+        from PyQt5.QtGui import QFont
         self.text_input.setText(tpl.get("text", ""))
-        self.font_combo.setCurrentFont(tpl.get("font", self.font_combo.currentFont().family()))
+        self.font_combo.setCurrentFont(QFont(tpl.get("font", self.font_combo.currentFont().family())))
         self.font_size_spin.setValue(tpl.get("font_size", 32))
         self.bold_check.setChecked(tpl.get("bold", False))
         self.italic_check.setChecked(tpl.get("italic", False))
@@ -348,64 +377,6 @@ class WatermarkMainWindow(QMainWindow):
         if dir_:
             self.output_dir_edit.setText(dir_)
 
-    def export_images(self):
-        if not self.image_list:
-            QMessageBox.warning(self, "提示", "请先导入图片！")
-            return
-        out_dir = self.output_dir_edit.text().strip()
-        if not out_dir or not os.path.isdir(out_dir):
-            QMessageBox.warning(self, "提示", "请先选择有效的输出文件夹！")
-            return
-        prefix = self.naming_prefix.text()
-        suffix = self.naming_suffix.text()
-        fmt = "JPEG" if self.format_group.checkedId() == 0 else "PNG"
-        quality = self.quality_slider.value() if fmt == "JPEG" else None
-        resize_mode = self.resize_mode_combo.currentIndex()
-        resize_value = self.resize_value.text().strip()
-        from watermark.watermark_util import add_watermark
-        import traceback
-        for path in self.image_list:
-            try:
-                base = os.path.basename(path)
-                name, ext = os.path.splitext(base)
-                out_name = f"{prefix}{name}{suffix}.{fmt.lower()}"
-                out_path = os.path.join(out_dir, out_name)
-                # 获取水印参数
-                text, opacity, position, imgwm, imgwm_opacity, imgwm_scale = self.get_current_watermark_params()
-                img = add_watermark(
-                    path, text, opacity=opacity, position=position,
-                    img_watermark_path=imgwm if imgwm else None,
-                    imgwm_opacity=imgwm_opacity, imgwm_scale=imgwm_scale
-                )
-                # 尺寸缩放
-                if resize_mode > 0 and resize_value:
-                    try:
-                        if resize_mode == 1:  # 按宽度
-                            w = int(resize_value)
-                            h = int(img.height * w / img.width)
-                            img = img.resize((w, int(h)), Image.LANCZOS)
-                        elif resize_mode == 2:  # 按高度
-                            h = int(resize_value)
-                            w = int(img.width * h / img.height)
-                            img = img.resize((int(w), h), Image.LANCZOS)
-                        elif resize_mode == 3:  # 按百分比
-                            scale = float(resize_value) / 100.0
-                            w = int(img.width * scale)
-                            h = int(img.height * scale)
-                            img = img.resize((w, h), Image.LANCZOS)
-                    except Exception:
-                        pass
-                # 保存
-                save_kwargs = {}
-                if fmt == "JPEG":
-                    save_kwargs["quality"] = quality
-                    save_kwargs["subsampling"] = 0
-                img.save(out_path, fmt, **save_kwargs)
-            except Exception as e:
-                print(f"导出失败: {path}\n{traceback.format_exc()}")
-        QMessageBox.information(self, "完成", "批量导出完成！")
-
-    # ...existing code...
     def get_current_watermark_params(self):
         text = self.text_input.text()
         font = self.font_combo.currentFont().family()
