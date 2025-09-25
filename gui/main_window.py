@@ -12,6 +12,12 @@ import os
 from PIL import Image
 
 class WatermarkMainWindow(QMainWindow):
+    # 导出进度条
+    self.progress_bar = QSlider(Qt.Horizontal)
+    self.progress_bar.setRange(0, 100)
+    self.progress_bar.setValue(0)
+    self.progress_bar.setEnabled(False)
+    right_layout.addWidget(self.progress_bar)
     # ...existing code...
     def __init__(self):
         super().__init__()
@@ -495,7 +501,11 @@ class WatermarkMainWindow(QMainWindow):
             resize_value = self.resize_value.text().strip()
             from watermark.watermark_util import add_watermark
             import traceback
-            for path in self.image_list:
+            total = len(self.image_list)
+            self.progress_bar.setEnabled(True)
+            self.progress_bar.setRange(0, total)
+            self.progress_bar.setValue(0)
+            for idx, path in enumerate(self.image_list, 1):
                 try:
                     base = os.path.basename(path)
                     name, ext = os.path.splitext(base)
@@ -539,6 +549,8 @@ class WatermarkMainWindow(QMainWindow):
                     img.save(out_path, fmt, **save_kwargs)
                 except Exception as e:
                     print(f"导出失败: {path}\n{traceback.format_exc()}")
+                self.progress_bar.setValue(idx)
+            self.progress_bar.setEnabled(False)
             QMessageBox.information(self, "完成", "批量导出完成！")
         self.add_images(files)
 
