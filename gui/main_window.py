@@ -6,10 +6,49 @@ from PyQt5.QtWidgets import (
     QLineEdit, QSlider, QComboBox, QFormLayout, QGroupBox, QRadioButton, QButtonGroup, QMessageBox
     , QFontComboBox, QColorDialog, QSpinBox, QCheckBox
 )
+from PyQt5.QtCore import QUrl
 from PyQt5.QtGui import QPixmap, QIcon
 from PyQt5.QtCore import Qt, QSize
 import os
 from PIL import Image
+
+
+# 支持拖拽导入图片的自定义列表控件
+class ImageListWidget(QListWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAcceptDrops(True)
+        self.setDragDropMode(QAbstractItemView.DropOnly)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            super().dragEnterEvent(event)
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            super().dragMoveEvent(event)
+
+    def dropEvent(self, event):
+        if event.mimeData().hasUrls():
+            files = []
+            for url in event.mimeData().urls():
+                path = url.toLocalFile()
+                if os.path.isdir(path):
+                    # 文件夹，递归导入图片
+                    for f in os.listdir(path):
+                        if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff")):
+                            files.append(os.path.join(path, f))
+                elif path.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff")):
+                    files.append(path)
+            if hasattr(self.parent().parent(), 'add_images'):
+                self.parent().parent().add_images(files)
+            event.acceptProposedAction()
+        else:
+            super().dropEvent(event)
 
 class WatermarkMainWindow(QMainWindow):
 
@@ -32,7 +71,7 @@ class WatermarkMainWindow(QMainWindow):
 
         # 左侧：图片列表
         left_layout = QVBoxLayout()
-        self.list_widget = QListWidget()
+        self.list_widget = ImageListWidget(self)
         self.list_widget.setIconSize(QSize(100, 100))
         self.list_widget.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.list_widget.itemSelectionChanged.connect(self.on_image_selected)
@@ -53,7 +92,7 @@ class WatermarkMainWindow(QMainWindow):
 
         main_layout.addLayout(left_layout, 2)
 
-        # 右侧：预览区 + 水印参数设置
+        # 右侧：预览区
         right_layout = QVBoxLayout()
         self.preview_label = QLabel("预览区")
         self.preview_label.setAlignment(Qt.AlignCenter)
@@ -62,7 +101,10 @@ class WatermarkMainWindow(QMainWindow):
         self.preview_label.mouseMoveEvent = self.on_preview_mouse_move
         self.preview_label.mouseReleaseEvent = self.on_preview_mouse_release
         right_layout.addWidget(self.preview_label)
+        main_layout.addLayout(right_layout, 3)
 
+        # 设置区域
+        setting_layout = QVBoxLayout()
         # 水印参数设置区
         param_layout = QFormLayout()
         # 文本内容
@@ -115,14 +157,14 @@ class WatermarkMainWindow(QMainWindow):
         self.position_combo.currentIndexChanged.connect(self.on_position_changed)
         param_layout.addRow("位置：", self.position_combo)
 
-        right_layout.addLayout(param_layout)
+        setting_layout.addLayout(param_layout)
 
         # 导出进度条
         self.progress_bar = QSlider(Qt.Horizontal)
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         self.progress_bar.setEnabled(False)
-        right_layout.addWidget(self.progress_bar)
+        setting_layout.addWidget(self.progress_bar)
 
         # 图片水印设置区
         imgwm_group = QGroupBox("图片水印（可选）")
@@ -145,7 +187,7 @@ class WatermarkMainWindow(QMainWindow):
         self.imgwm_scale.valueChanged.connect(self.update_preview)
         imgwm_layout.addRow("缩放(%)：", self.imgwm_scale)
         imgwm_group.setLayout(imgwm_layout)
-        right_layout.addWidget(imgwm_group)
+        setting_layout.addWidget(imgwm_group)
 
         # 导出设置区
         export_group = QGroupBox("导出设置")
@@ -193,12 +235,12 @@ class WatermarkMainWindow(QMainWindow):
         resize_layout.addWidget(self.resize_value)
         export_layout.addRow("尺寸调整：", resize_layout)
         export_group.setLayout(export_layout)
-        right_layout.addWidget(export_group)
+        setting_layout.addWidget(export_group)
 
         # 导出按钮
         btn_export = QPushButton("批量导出水印图片")
         btn_export.clicked.connect(self.export_images)
-        right_layout.addWidget(btn_export)
+        setting_layout.addWidget(btn_export)
 
         # 模板管理区
         template_group = QGroupBox("水印模板管理")
@@ -216,12 +258,12 @@ class WatermarkMainWindow(QMainWindow):
         template_layout.addWidget(btn_load_tpl)
         template_layout.addWidget(btn_del_tpl)
         template_group.setLayout(template_layout)
-        right_layout.addWidget(template_group)
+        setting_layout.addWidget(template_group)
 
         # 自动加载上次设置
         self.load_last_template()
 
-        main_layout.addLayout(right_layout, 5)
+        main_layout.addLayout(setting_layout, 5)
 
     def on_image_selected(self):
         self.update_preview()
@@ -436,9 +478,6 @@ class WatermarkMainWindow(QMainWindow):
             self.preview_label.setPixmap(scaled)
         except Exception as e:
             self.preview_label.setText(f"预览失败: {e}")
-
-        # 支持拖拽导入
-        self.setAcceptDrops(True)
 
     def import_images(self):
         files, _ = QFileDialog.getOpenFileNames(self, "选择图片", "", "图片文件 (*.jpg *.jpeg *.png *.bmp *.tiff)")
