@@ -123,6 +123,24 @@ class WatermarkMainWindow(QMainWindow):
         fmt_layout.addWidget(radio_jpg)
         fmt_layout.addWidget(radio_png)
         export_layout.addRow("输出格式：", fmt_layout)
+
+        # JPEG 质量调节
+        self.quality_slider = QSlider(Qt.Horizontal)
+        self.quality_slider.setRange(10, 100)
+        self.quality_slider.setValue(90)
+        self.quality_slider.setTickInterval(10)
+        self.quality_slider.setTickPosition(QSlider.TicksBelow)
+        export_layout.addRow("JPEG质量：", self.quality_slider)
+
+        # 尺寸缩放设置
+        self.resize_mode_combo = QComboBox()
+        self.resize_mode_combo.addItems(["不缩放", "按宽度", "按高度", "按百分比"])
+        self.resize_value = QLineEdit()
+        self.resize_value.setPlaceholderText("数值，如800 或 50")
+        resize_layout = QHBoxLayout()
+        resize_layout.addWidget(self.resize_mode_combo)
+        resize_layout.addWidget(self.resize_value)
+        export_layout.addRow("尺寸调整：", resize_layout)
         export_group.setLayout(export_layout)
         right_layout.addWidget(export_group)
 
@@ -228,7 +246,6 @@ class WatermarkMainWindow(QMainWindow):
             self.output_dir_edit.setText(dir_)
 
     def export_images(self):
-    # ...已在文件顶部导入所需 PyQt5 组件...
         if not self.image_list:
             QMessageBox.warning(self, "提示", "请先导入图片！")
             return
@@ -239,7 +256,9 @@ class WatermarkMainWindow(QMainWindow):
         prefix = self.naming_prefix.text()
         suffix = self.naming_suffix.text()
         fmt = "JPEG" if self.format_group.checkedId() == 0 else "PNG"
-        text, opacity, position = self.get_current_watermark_params()
+        quality = self.quality_slider.value() if fmt == "JPEG" else None
+        resize_mode = self.resize_mode_combo.currentIndex()
+        resize_value = self.resize_value.text().strip()
         from watermark.watermark_util import add_watermark
         import traceback
         for path in self.image_list:
@@ -248,8 +267,37 @@ class WatermarkMainWindow(QMainWindow):
                 name, ext = os.path.splitext(base)
                 out_name = f"{prefix}{name}{suffix}.{fmt.lower()}"
                 out_path = os.path.join(out_dir, out_name)
-                img = add_watermark(path, text, opacity=opacity, position=position)
-                img.save(out_path, fmt)
+                # 获取水印参数
+                text, opacity, position, imgwm, imgwm_opacity, imgwm_scale = self.get_current_watermark_params()
+                img = add_watermark(
+                    path, text, opacity=opacity, position=position,
+                    img_watermark_path=imgwm if imgwm else None,
+                    imgwm_opacity=imgwm_opacity, imgwm_scale=imgwm_scale
+                )
+                # 尺寸缩放
+                if resize_mode > 0 and resize_value:
+                    try:
+                        if resize_mode == 1:  # 按宽度
+                            w = int(resize_value)
+                            h = int(img.height * w / img.width)
+                            img = img.resize((w, int(h)), Image.LANCZOS)
+                        elif resize_mode == 2:  # 按高度
+                            h = int(resize_value)
+                            w = int(img.width * h / img.height)
+                            img = img.resize((int(w), h), Image.LANCZOS)
+                        elif resize_mode == 3:  # 按百分比
+                            scale = float(resize_value) / 100.0
+                            w = int(img.width * scale)
+                            h = int(img.height * scale)
+                            img = img.resize((w, h), Image.LANCZOS)
+                    except Exception:
+                        pass
+                # 保存
+                save_kwargs = {}
+                if fmt == "JPEG":
+                    save_kwargs["quality"] = quality
+                    save_kwargs["subsampling"] = 0
+                img.save(out_path, fmt, **save_kwargs)
             except Exception as e:
                 print(f"导出失败: {path}\n{traceback.format_exc()}")
         QMessageBox.information(self, "完成", "批量导出完成！")
