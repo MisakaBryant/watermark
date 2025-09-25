@@ -1,36 +1,61 @@
-# Watermark CLI Tool
 
-本项目是一个命令行工具，可批量为图片添加拍摄日期水印。
+# Watermark GUI Tool
 
-## 功能
-- 递归扫描指定目录下所有图片文件
-- 读取图片 EXIF 拍摄时间，提取年月日作为水印
-- 支持自定义字体大小、颜色和水印位置（左上、居中、右下）
-- 处理后图片保存到原目录名_watermark 子目录
+本项目是一个本地图片水印批量处理工具，支持 Windows 和 MacOS，具备图形界面，支持多种图片格式、丰富的水印和导出选项，以及水印模板管理。
+
+## 功能概览
+
+### 1. 文件处理
+- 支持单张/多张图片拖拽或文件选择器导入
+- 支持批量导入整个文件夹
+- 支持 JPEG、PNG（含透明通道）、BMP、TIFF
+- 输出格式可选 JPEG 或 PNG
+- 导出文件夹可自定义，默认禁止覆盖原图
+- 导出命名规则：保留原名/自定义前缀/后缀
+- JPEG 支持图片质量调节（0-100，可选）
+- 支持导出时调整图片尺寸（可选）
+
+### 2. 水印类型
+- 文本水印：自定义内容、透明度、位置、实时预览
+- 图片水印（可选）：支持 PNG 透明通道、缩放、透明度调节
+
+### 3. 水印布局与样式
+- 实时预览，支持九宫格定位和手动拖拽
+- 支持水印旋转（可选）
+
+### 4. 配置管理
+- 支持水印模板的保存、加载、删除
+- 启动时自动加载上次设置或默认模板
 
 ## 安装依赖
 ```bash
-pip install pillow piexif
+pip install pillow piexif PyQt5
 ```
 
 ## 使用方法
-```bash
-python -m watermark.main <图片或目录路径> [--font-size 32] [--color "#FFFFFF"] [--position right_bottom]
-```
+- 运行 `python watermark_gui.py` 启动图形界面
+- 或 `python -m gui` 启动
+- 按界面提示导入图片、设置水印、导出
 
-- `--font-size`：字体大小，默认32
-- `--color`：水印颜色，默认白色
-- `--position`：水印位置，可选 left_top/center/right_bottom，默认 right_bottom
-
-## 示例
+## 打包说明
+- 推荐使用 pyinstaller 打包为 Windows 可执行文件：
 ```bash
-python -m watermark.main ./photos --font-size 40 --color "#FF0000" --position center
+pyinstaller -F -w watermark/gui.py -n WatermarkTool
 ```
+- 打包后 exe 位于 dist 目录
 
-## 测试
-```bash
-python -m unittest discover tests
-```
+## 目录结构
+- watermark/  # 核心逻辑
+- gui/        # 图形界面
+- tests/      # 测试
+- photos/     # 示例图片
+
+## 贡献规范
+- 遵循 Conventional Commits 规范
+- 每次提交内容单一、描述清晰
+- 详细记录开发过程
 
 ---
+
+> 本项目致力于提供高效、易用的本地图片水印批量处理体验，欢迎贡献和建议！
 
