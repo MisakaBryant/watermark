@@ -287,8 +287,14 @@ class WatermarkMainWindow(QMainWindow):
             return
         tpl = {
             "text": self.text_input.text(),
+            "font": self.font_combo.currentFont().family(),
+            "font_size": self.font_size_spin.value(),
+            "bold": self.bold_check.isChecked(),
+            "italic": self.italic_check.isChecked(),
+            "color": self.text_color,
             "opacity": self.opacity_slider.value(),
-            "position": self.position_combo.currentIndex(),
+            "position": self.position_combo.currentText(),
+            "custom_pos": self.custom_pos,
             "prefix": self.naming_prefix.text(),
             "suffix": self.naming_suffix.text(),
             "format": self.format_group.checkedId()
@@ -304,8 +310,22 @@ class WatermarkMainWindow(QMainWindow):
             return
         tpl = self.templates[name]
         self.text_input.setText(tpl.get("text", ""))
+        self.font_combo.setCurrentFont(tpl.get("font", self.font_combo.currentFont().family()))
+        self.font_size_spin.setValue(tpl.get("font_size", 32))
+        self.bold_check.setChecked(tpl.get("bold", False))
+        self.italic_check.setChecked(tpl.get("italic", False))
+        self.text_color = tpl.get("color", "#FFFFFF")
         self.opacity_slider.setValue(tpl.get("opacity", 60))
-        self.position_combo.setCurrentIndex(tpl.get("position", 2))
+        pos = tpl.get("position", "居中")
+        idx = self.position_combo.findText(pos)
+        if idx == -1 and pos == "自定义":
+            if self.position_combo.findText("自定义") == -1:
+                self.position_combo.addItem("自定义")
+            self.position_combo.setCurrentText("自定义")
+            self.custom_pos = tpl.get("custom_pos", None)
+        else:
+            self.position_combo.setCurrentIndex(idx if idx != -1 else 4)
+            self.custom_pos = None
         self.naming_prefix.setText(tpl.get("prefix", "wm_"))
         self.naming_suffix.setText(tpl.get("suffix", ""))
         fmt = tpl.get("format", 0)
