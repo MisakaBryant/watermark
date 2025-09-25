@@ -91,7 +91,11 @@ class WatermarkMainWindow(QMainWindow):
         param_layout.addRow("透明度：", self.opacity_slider)
         # 位置
         self.position_combo = QComboBox()
-        self.position_combo.addItems(["左上", "居中", "右下"])
+        self.position_combo.addItems([
+            "左上", "上中", "右上",
+            "左中", "居中", "右中",
+            "左下", "下中", "右下"
+        ])
         self.position_combo.currentIndexChanged.connect(self.update_preview)
         param_layout.addRow("位置：", self.position_combo)
         right_layout.addLayout(param_layout)
@@ -340,7 +344,11 @@ class WatermarkMainWindow(QMainWindow):
         italic = self.italic_check.isChecked()
         color = self.text_color
         opacity = self.opacity_slider.value()
-        pos_map = {0: "left_top", 1: "center", 2: "right_bottom"}
+        pos_map = {
+            0: "left_top", 1: "top_center", 2: "right_top",
+            3: "left_center", 4: "center", 5: "right_center",
+            6: "left_bottom", 7: "bottom_center", 8: "right_bottom"
+        }
         position = pos_map.get(self.position_combo.currentIndex(), "right_bottom")
         imgwm = self.imgwm_path.text().strip()
         imgwm_opacity = self.imgwm_opacity.value()

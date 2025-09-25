@@ -58,13 +58,26 @@ def add_watermark(
     # PIL 不直接支持粗体/斜体，部分字体可用
     text_size = draw.textbbox((0,0), text, font=font_obj)
     w, h = text_size[2] - text_size[0], text_size[3] - text_size[1]
-    # 位置计算
+    # 九宫格九点布局
+    margin = 10
     if position == "left_top":
-        xy = (10, 10)
+        xy = (margin, margin)
+    elif position == "top_center":
+        xy = ((img.width - w)//2, margin)
+    elif position == "right_top":
+        xy = (img.width - w - margin, margin)
+    elif position == "left_center":
+        xy = (margin, (img.height - h)//2)
     elif position == "center":
         xy = ((img.width - w)//2, (img.height - h)//2)
+    elif position == "right_center":
+        xy = (img.width - w - margin, (img.height - h)//2)
+    elif position == "left_bottom":
+        xy = (margin, img.height - h - margin)
+    elif position == "bottom_center":
+        xy = ((img.width - w)//2, img.height - h - margin)
     else:  # right_bottom
-        xy = (img.width - w - 10, img.height - h - 10)
+        xy = (img.width - w - margin, img.height - h - margin)
     # 透明度处理
     if color.startswith("#") and len(color) == 7:
         rgb = tuple(int(color[i:i+2], 16) for i in (1, 3, 5))
