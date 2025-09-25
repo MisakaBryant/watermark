@@ -2,7 +2,8 @@ import sys
 
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QListWidget, QListWidgetItem, QFileDialog, QLabel, QAbstractItemView
+    QListWidget, QListWidgetItem, QFileDialog, QLabel, QAbstractItemView,
+    QLineEdit, QSlider, QComboBox, QFormLayout, QGroupBox, QRadioButton, QButtonGroup, QMessageBox
 )
 from PyQt5.QtGui import QPixmap, QIcon
 from PyQt5.QtCore import Qt
@@ -53,7 +54,7 @@ class WatermarkMainWindow(QMainWindow):
         right_layout.addWidget(self.preview_label)
 
         # 水印参数设置区
-        from PyQt5.QtWidgets import QLineEdit, QSlider, QComboBox, QFormLayout, QGroupBox, QRadioButton, QButtonGroup, QMessageBox
+    # ...已在文件顶部导入所需 PyQt5 组件...
         param_layout = QFormLayout()
         # 文本内容
         self.text_input = QLineEdit("Watermark")
@@ -71,6 +72,29 @@ class WatermarkMainWindow(QMainWindow):
         self.position_combo.currentIndexChanged.connect(self.update_preview)
         param_layout.addRow("位置：", self.position_combo)
         right_layout.addLayout(param_layout)
+
+        # 图片水印设置区
+        imgwm_group = QGroupBox("图片水印（可选）")
+        imgwm_layout = QFormLayout()
+        self.imgwm_path = QLineEdit()
+        btn_choose_imgwm = QPushButton("选择图片")
+        btn_choose_imgwm.clicked.connect(self.choose_imgwm)
+        imgwm_path_layout = QHBoxLayout()
+        imgwm_path_layout.addWidget(self.imgwm_path)
+        imgwm_path_layout.addWidget(btn_choose_imgwm)
+        imgwm_layout.addRow("水印图片：", imgwm_path_layout)
+        self.imgwm_opacity = QSlider(Qt.Horizontal)
+        self.imgwm_opacity.setRange(0, 100)
+        self.imgwm_opacity.setValue(60)
+        self.imgwm_opacity.valueChanged.connect(self.update_preview)
+        imgwm_layout.addRow("图片透明度：", self.imgwm_opacity)
+        self.imgwm_scale = QSlider(Qt.Horizontal)
+        self.imgwm_scale.setRange(10, 200)
+        self.imgwm_scale.setValue(100)
+        self.imgwm_scale.valueChanged.connect(self.update_preview)
+        imgwm_layout.addRow("缩放(%)：", self.imgwm_scale)
+        imgwm_group.setLayout(imgwm_layout)
+        right_layout.addWidget(imgwm_group)
 
         # 导出设置区
         export_group = QGroupBox("导出设置")
@@ -129,6 +153,12 @@ class WatermarkMainWindow(QMainWindow):
         self.load_last_template()
 
         main_layout.addLayout(right_layout, 5)
+
+    def choose_imgwm(self):
+        path, _ = QFileDialog.getOpenFileName(self, "选择水印图片", "", "图片文件 (*.png *.jpg *.jpeg *.bmp *.tiff)")
+        if path:
+            self.imgwm_path.setText(path)
+            self.update_preview()
 
     def get_template_path(self):
         import os
@@ -191,104 +221,6 @@ class WatermarkMainWindow(QMainWindow):
         if hasattr(self, "templates") and self.templates:
             self.template_combo.setCurrentIndex(0)
             self.load_selected_template()
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Watermark 批量水印工具")
-        self.setGeometry(200, 200, 1000, 700)
-
-        self.image_list = []  # 存储图片路径
-
-        # 主布局
-        main_widget = QWidget()
-        main_layout = QHBoxLayout()
-        main_widget.setLayout(main_layout)
-        self.setCentralWidget(main_widget)
-
-        # 左侧：图片列表
-        left_layout = QVBoxLayout()
-        self.list_widget = QListWidget()
-        self.list_widget.setIconSize(Qt.QSize(100, 100))
-        self.list_widget.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.list_widget.itemSelectionChanged.connect(self.on_image_selected)
-        left_layout.addWidget(QLabel("已导入图片："))
-        left_layout.addWidget(self.list_widget)
-
-        btn_layout = QHBoxLayout()
-        btn_import = QPushButton("导入图片")
-        btn_import.clicked.connect(self.import_images)
-        btn_folder = QPushButton("导入文件夹")
-        btn_folder.clicked.connect(self.import_folder)
-        btn_delete = QPushButton("删除选中")
-        btn_delete.clicked.connect(self.delete_selected)
-        btn_layout.addWidget(btn_import)
-        btn_layout.addWidget(btn_folder)
-        btn_layout.addWidget(btn_delete)
-        left_layout.addLayout(btn_layout)
-
-        main_layout.addLayout(left_layout, 2)
-
-        # 右侧：预览区 + 水印参数设置
-        right_layout = QVBoxLayout()
-        self.preview_label = QLabel("预览区")
-        self.preview_label.setAlignment(Qt.AlignCenter)
-        right_layout.addWidget(self.preview_label)
-
-        # 水印参数设置区
-        from PyQt5.QtWidgets import QLineEdit, QSlider, QComboBox, QFormLayout, QGroupBox, QRadioButton, QButtonGroup, QMessageBox
-        param_layout = QFormLayout()
-        # 文本内容
-        self.text_input = QLineEdit("Watermark")
-        self.text_input.textChanged.connect(self.update_preview)
-        param_layout.addRow("水印文本：", self.text_input)
-        # 透明度
-        self.opacity_slider = QSlider(Qt.Horizontal)
-        self.opacity_slider.setRange(0, 100)
-        self.opacity_slider.setValue(60)
-        self.opacity_slider.valueChanged.connect(self.update_preview)
-        param_layout.addRow("透明度：", self.opacity_slider)
-        # 位置
-        self.position_combo = QComboBox()
-        self.position_combo.addItems(["左上", "居中", "右下"])
-        self.position_combo.currentIndexChanged.connect(self.update_preview)
-        param_layout.addRow("位置：", self.position_combo)
-        right_layout.addLayout(param_layout)
-
-        # 导出设置区
-        export_group = QGroupBox("导出设置")
-        export_layout = QFormLayout()
-        # 输出文件夹
-        self.output_dir_edit = QLineEdit()
-        btn_choose_dir = QPushButton("选择...")
-        btn_choose_dir.clicked.connect(self.choose_output_dir)
-        dir_layout = QHBoxLayout()
-        dir_layout.addWidget(self.output_dir_edit)
-        dir_layout.addWidget(btn_choose_dir)
-        export_layout.addRow("输出文件夹：", dir_layout)
-        # 命名规则
-        self.naming_prefix = QLineEdit("wm_")
-        self.naming_suffix = QLineEdit("")
-        export_layout.addRow("前缀：", self.naming_prefix)
-        export_layout.addRow("后缀：", self.naming_suffix)
-        # 输出格式
-        self.format_group = QButtonGroup()
-        radio_jpg = QRadioButton("JPEG")
-        radio_png = QRadioButton("PNG")
-        self.format_group.addButton(radio_jpg, 0)
-        self.format_group.addButton(radio_png, 1)
-        radio_jpg.setChecked(True)
-        fmt_layout = QHBoxLayout()
-        fmt_layout.addWidget(radio_jpg)
-        fmt_layout.addWidget(radio_png)
-        export_layout.addRow("输出格式：", fmt_layout)
-        export_group.setLayout(export_layout)
-        right_layout.addWidget(export_group)
-
-        # 导出按钮
-        btn_export = QPushButton("批量导出水印图片")
-        btn_export.clicked.connect(self.export_images)
-        right_layout.addWidget(btn_export)
-
-        main_layout.addLayout(right_layout, 5)
 
     def choose_output_dir(self):
         dir_ = QFileDialog.getExistingDirectory(self, "选择输出文件夹")
@@ -296,7 +228,7 @@ class WatermarkMainWindow(QMainWindow):
             self.output_dir_edit.setText(dir_)
 
     def export_images(self):
-        from PyQt5.QtWidgets import QMessageBox
+    # ...已在文件顶部导入所需 PyQt5 组件...
         if not self.image_list:
             QMessageBox.warning(self, "提示", "请先导入图片！")
             return
@@ -321,77 +253,17 @@ class WatermarkMainWindow(QMainWindow):
             except Exception as e:
                 print(f"导出失败: {path}\n{traceback.format_exc()}")
         QMessageBox.information(self, "完成", "批量导出完成！")
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Watermark 批量水印工具")
-        self.setGeometry(200, 200, 1000, 700)
 
-        self.image_list = []  # 存储图片路径
-
-        # 主布局
-        main_widget = QWidget()
-        main_layout = QHBoxLayout()
-        main_widget.setLayout(main_layout)
-        self.setCentralWidget(main_widget)
-
-
-        # 左侧：图片列表
-        left_layout = QVBoxLayout()
-        self.list_widget = QListWidget()
-        self.list_widget.setIconSize(Qt.QSize(100, 100))
-        self.list_widget.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.list_widget.itemSelectionChanged.connect(self.on_image_selected)
-        left_layout.addWidget(QLabel("已导入图片："))
-        left_layout.addWidget(self.list_widget)
-
-        btn_layout = QHBoxLayout()
-        btn_import = QPushButton("导入图片")
-        btn_import.clicked.connect(self.import_images)
-        btn_folder = QPushButton("导入文件夹")
-        btn_folder.clicked.connect(self.import_folder)
-        btn_delete = QPushButton("删除选中")
-        btn_delete.clicked.connect(self.delete_selected)
-        btn_layout.addWidget(btn_import)
-        btn_layout.addWidget(btn_folder)
-        btn_layout.addWidget(btn_delete)
-        left_layout.addLayout(btn_layout)
-
-        main_layout.addLayout(left_layout, 2)
-
-
-    # 右侧：预览区 + 水印参数设置
-    right_layout = QVBoxLayout()
-    self.preview_label = QLabel("预览区")
-    self.preview_label.setAlignment(Qt.AlignCenter)
-    right_layout.addWidget(self.preview_label)
-
-    # 水印参数设置区
-    from PyQt5.QtWidgets import QLineEdit, QSlider, QComboBox, QFormLayout
-    param_layout = QFormLayout()
-    # 文本内容
-    self.text_input = QLineEdit("Watermark")
-    self.text_input.textChanged.connect(self.update_preview)
-    param_layout.addRow("水印文本：", self.text_input)
-    # 透明度
-    self.opacity_slider = QSlider(Qt.Horizontal)
-    self.opacity_slider.setRange(0, 100)
-    self.opacity_slider.setValue(60)
-    self.opacity_slider.valueChanged.connect(self.update_preview)
-    param_layout.addRow("透明度：", self.opacity_slider)
-    # 位置
-    self.position_combo = QComboBox()
-    self.position_combo.addItems(["左上", "居中", "右下"])
-    self.position_combo.currentIndexChanged.connect(self.update_preview)
-    param_layout.addRow("位置：", self.position_combo)
-
-    right_layout.addLayout(param_layout)
-    main_layout.addLayout(right_layout, 5)
+    # ...existing code...
     def get_current_watermark_params(self):
         text = self.text_input.text()
         opacity = self.opacity_slider.value()
         pos_map = {0: "left_top", 1: "center", 2: "right_bottom"}
         position = pos_map.get(self.position_combo.currentIndex(), "right_bottom")
-        return text, opacity, position
+        imgwm = self.imgwm_path.text().strip()
+        imgwm_opacity = self.imgwm_opacity.value()
+        imgwm_scale = self.imgwm_scale.value()
+        return text, opacity, position, imgwm, imgwm_opacity, imgwm_scale
 
     def update_preview(self):
         selected = self.list_widget.selectedItems()
@@ -406,9 +278,13 @@ class WatermarkMainWindow(QMainWindow):
             return
         # 应用水印
         from watermark.watermark_util import add_watermark
-        text, opacity, position = self.get_current_watermark_params()
+        text, opacity, position, imgwm, imgwm_opacity, imgwm_scale = self.get_current_watermark_params()
         try:
-            watermarked = add_watermark(img_path, text, opacity=opacity, position=position)
+            watermarked = add_watermark(
+                img_path, text, opacity=opacity, position=position,
+                img_watermark_path=imgwm if imgwm else None,
+                imgwm_opacity=imgwm_opacity, imgwm_scale=imgwm_scale
+            )
             # 转 QPixmap
             import io
             buf = io.BytesIO()
