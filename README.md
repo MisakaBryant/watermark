@@ -44,7 +44,7 @@ pip install pillow piexif PyQt5
 ## 打包说明
 - 推荐使用 pyinstaller 打包为 Windows 可执行文件：
 ```bash
-pyinstaller -F -w watermark/gui.py -n WatermarkTool
+pyinstaller -F -w gui/__main__.py -n WatermarkTool --hidden-import gui
 ```
 - 打包后 exe 位于 dist 目录
 

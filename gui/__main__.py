@@ -1,4 +1,4 @@
-from .main_window import WatermarkMainWindow
+from gui.main_window import WatermarkMainWindow
 import sys
 from PyQt5.QtWidgets import QApplication
 
