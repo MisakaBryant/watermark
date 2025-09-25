@@ -11,7 +11,8 @@ def add_watermark(
     italic: bool = False,
     color: str = "#FFFFFF",
     position: str = "right_bottom",
-    opacity: int = 60
+    opacity: int = 60,
+    rotate: int = 0
 ) -> Image.Image:
     """
     opacity: 0-100, 100为不透明
@@ -56,8 +57,17 @@ def add_watermark(
     except Exception:
         font_obj = ImageFont.load_default()
     # PIL 不直接支持粗体/斜体，部分字体可用
-    text_size = draw.textbbox((0,0), text, font=font_obj)
-    w, h = text_size[2] - text_size[0], text_size[3] - text_size[1]
+    # 先计算文本尺寸
+    text_bbox = draw.textbbox((0,0), text, font=font_obj)
+    w, h = text_bbox[2] - text_bbox[0], text_bbox[3] - text_bbox[1]
+    # 若旋转，需计算旋转后尺寸
+    if rotate:
+        import math
+        rad = math.radians(rotate)
+        cosv, sinv = abs(math.cos(rad)), abs(math.sin(rad))
+        w_rot = int(w * cosv + h * sinv)
+        h_rot = int(w * sinv + h * cosv)
+        w, h = w_rot, h_rot
     # 九宫格九点布局
     margin = 10
     if position == "left_top":
@@ -87,18 +97,25 @@ def add_watermark(
     # 阴影和描边参数
     shadow_offset = 2
     outline_width = 2
+    # 先在独立图层绘制文本（便于旋转）
+    text_img = Image.new("RGBA", (w, h), (255,255,255,0))
+    text_draw = ImageDraw.Draw(text_img)
     # 阴影（黑色半透明）
     shadow_fill = (0, 0, 0, int(255 * opacity / 100 * 0.6))
-    shadow_xy = (xy[0] + shadow_offset, xy[1] + shadow_offset)
-    draw.text(shadow_xy, text, font=font_obj, fill=shadow_fill)
+    text_draw.text((shadow_offset, shadow_offset), text, font=font_obj, fill=shadow_fill)
     # 描边（白色/黑色，自动判断）
     outline_color = (0, 0, 0, int(255 * opacity / 100)) if sum(fill[:3]) > 400 else (255, 255, 255, int(255 * opacity / 100))
     for dx in range(-outline_width, outline_width+1):
         for dy in range(-outline_width, outline_width+1):
             if dx == 0 and dy == 0:
                 continue
-            draw.text((xy[0]+dx, xy[1]+dy), text, font=font_obj, fill=outline_color)
+            text_draw.text((shadow_offset+dx, shadow_offset+dy), text, font=font_obj, fill=outline_color)
     # 正文
-    draw.text(xy, text, font=font_obj, fill=fill)
+    text_draw.text((0,0), text, font=font_obj, fill=fill)
+    # 旋转
+    if rotate:
+        text_img = text_img.rotate(rotate, expand=1, resample=Image.BICUBIC)
+    # 粘贴到 txt_layer
+    txt_layer.alpha_composite(text_img, dest=xy)
     watermarked = Image.alpha_composite(img, txt_layer)
     return watermarked.convert("RGB")

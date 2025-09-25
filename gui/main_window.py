@@ -12,13 +12,6 @@ import os
 from PIL import Image
 
 class WatermarkMainWindow(QMainWindow):
-    # 导出进度条
-    self.progress_bar = QSlider(Qt.Horizontal)
-    self.progress_bar.setRange(0, 100)
-    self.progress_bar.setValue(0)
-    self.progress_bar.setEnabled(False)
-    right_layout.addWidget(self.progress_bar)
-    # ...existing code...
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Watermark 批量水印工具")
@@ -35,50 +28,6 @@ class WatermarkMainWindow(QMainWindow):
         # 拖拽相关
         self.custom_pos = None  # (x, y) 归一化坐标
         self.dragging = False
-
-        # ...existing code...
-
-        # 右侧：预览区 + 水印参数设置
-        right_layout = QVBoxLayout()
-        self.preview_label = QLabel("预览区")
-        self.preview_label.setAlignment(Qt.AlignCenter)
-        # 拖拽事件绑定
-        self.preview_label.mousePressEvent = self.on_preview_mouse_press
-        self.preview_label.mouseMoveEvent = self.on_preview_mouse_move
-        self.preview_label.mouseReleaseEvent = self.on_preview_mouse_release
-        right_layout.addWidget(self.preview_label)
-    def on_preview_mouse_press(self, event):
-        if event.button() == Qt.LeftButton:
-            self.dragging = True
-            self._drag_start = event.pos()
-
-    def on_preview_mouse_move(self, event):
-        if self.dragging:
-            pos = event.pos()
-            # 计算归一化坐标
-            x = pos.x() / self.preview_label.width()
-            y = pos.y() / self.preview_label.height()
-            self.custom_pos = (x, y)
-            # 切换为“自定义”位置
-            if self.position_combo.findText("自定义") == -1:
-                self.position_combo.addItem("自定义")
-            self.position_combo.setCurrentText("自定义")
-            self.update_preview()
-
-    def on_preview_mouse_release(self, event):
-        self.dragging = False
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Watermark 批量水印工具")
-        self.setGeometry(200, 200, 1000, 700)
-
-        self.image_list = []  # 存储图片路径
-
-        # 主布局
-        main_widget = QWidget()
-        main_layout = QHBoxLayout()
-        main_widget.setLayout(main_layout)
-        self.setCentralWidget(main_widget)
 
         # 左侧：图片列表
         left_layout = QVBoxLayout()
@@ -107,6 +56,10 @@ class WatermarkMainWindow(QMainWindow):
         right_layout = QVBoxLayout()
         self.preview_label = QLabel("预览区")
         self.preview_label.setAlignment(Qt.AlignCenter)
+        # 拖拽事件绑定
+        self.preview_label.mousePressEvent = self.on_preview_mouse_press
+        self.preview_label.mouseMoveEvent = self.on_preview_mouse_move
+        self.preview_label.mouseReleaseEvent = self.on_preview_mouse_release
         right_layout.addWidget(self.preview_label)
 
         # 水印参数设置区
@@ -144,6 +97,13 @@ class WatermarkMainWindow(QMainWindow):
         self.opacity_slider.setValue(60)
         self.opacity_slider.valueChanged.connect(self.update_preview)
         param_layout.addRow("透明度：", self.opacity_slider)
+        # 旋转角度
+        self.rotate_spin = QSpinBox()
+        self.rotate_spin.setRange(-180, 180)
+        self.rotate_spin.setValue(0)
+        self.rotate_spin.setSuffix("°")
+        self.rotate_spin.valueChanged.connect(self.update_preview)
+        param_layout.addRow("旋转角度：", self.rotate_spin)
         # 位置
         self.position_combo = QComboBox()
         self.position_combo.addItems([
@@ -154,18 +114,14 @@ class WatermarkMainWindow(QMainWindow):
         self.position_combo.currentIndexChanged.connect(self.on_position_changed)
         param_layout.addRow("位置：", self.position_combo)
 
-    def on_position_changed(self):
-        # 切换九宫格时清除自定义坐标
-        if self.position_combo.currentText() != "自定义":
-            self.custom_pos = None
-        self.update_preview()
         right_layout.addLayout(param_layout)
 
-    def choose_text_color(self):
-        color = QColorDialog.getColor()
-        if color.isValid():
-            self.text_color = color.name()
-            self.update_preview()
+        # 导出进度条
+        self.progress_bar = QSlider(Qt.Horizontal)
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setEnabled(False)
+        right_layout.addWidget(self.progress_bar)
 
         # 图片水印设置区
         imgwm_group = QGroupBox("图片水印（可选）")
@@ -265,6 +221,39 @@ class WatermarkMainWindow(QMainWindow):
         self.load_last_template()
 
         main_layout.addLayout(right_layout, 5)
+
+    def on_preview_mouse_press(self, event):
+        if event.button() == Qt.LeftButton:
+            self.dragging = True
+            self._drag_start = event.pos()
+
+    def on_preview_mouse_move(self, event):
+        if self.dragging:
+            pos = event.pos()
+            # 计算归一化坐标
+            x = pos.x() / self.preview_label.width()
+            y = pos.y() / self.preview_label.height()
+            self.custom_pos = (x, y)
+            # 切换为“自定义”位置
+            if self.position_combo.findText("自定义") == -1:
+                self.position_combo.addItem("自定义")
+            self.position_combo.setCurrentText("自定义")
+            self.update_preview()
+
+    def on_preview_mouse_release(self, event):
+        self.dragging = False
+
+    def on_position_changed(self):
+        # 切换九宫格时清除自定义坐标
+        if self.position_combo.currentText() != "自定义":
+            self.custom_pos = None
+        self.update_preview()
+
+    def choose_text_color(self):
+        color = QColorDialog.getColor()
+        if color.isValid():
+            self.text_color = color.name()
+            self.update_preview()
 
     def choose_imgwm(self):
         path, _ = QFileDialog.getOpenFileName(self, "选择水印图片", "", "图片文件 (*.png *.jpg *.jpeg *.bmp *.tiff)")
@@ -425,6 +414,7 @@ class WatermarkMainWindow(QMainWindow):
         italic = self.italic_check.isChecked()
         color = self.text_color
         opacity = self.opacity_slider.value()
+        rotate = self.rotate_spin.value()
         pos_map = {
             0: "left_top", 1: "top_center", 2: "right_top",
             3: "left_center", 4: "center", 5: "right_center",
@@ -437,7 +427,7 @@ class WatermarkMainWindow(QMainWindow):
         imgwm = self.imgwm_path.text().strip()
         imgwm_opacity = self.imgwm_opacity.value()
         imgwm_scale = self.imgwm_scale.value()
-        return text, font, font_size, bold, italic, color, opacity, position, imgwm, imgwm_opacity, imgwm_scale
+        return text, font, font_size, bold, italic, color, opacity, rotate, position, imgwm, imgwm_opacity, imgwm_scale
 
     def update_preview(self):
         selected = self.list_widget.selectedItems()
@@ -453,14 +443,14 @@ class WatermarkMainWindow(QMainWindow):
         # 应用水印
         from watermark.watermark_util import add_watermark
         (
-            text, font, font_size, bold, italic, color, opacity, position,
+            text, font, font_size, bold, italic, color, opacity, rotate, position,
             imgwm, imgwm_opacity, imgwm_scale
         ) = self.get_current_watermark_params()
         try:
             watermarked = add_watermark(
                 img_path, text,
                 font=font, font_size=font_size, bold=bold, italic=italic, color=color,
-                opacity=opacity, position=position,
+                opacity=opacity, rotate=rotate, position=position,
                 img_watermark_path=imgwm if imgwm else None,
                 imgwm_opacity=imgwm_opacity, imgwm_scale=imgwm_scale
             )
@@ -485,77 +475,76 @@ class WatermarkMainWindow(QMainWindow):
 
     def import_folder(self):
         folder = QFileDialog.getExistingDirectory(self, "选择文件夹")
-        def export_images(self):
-            if not self.image_list:
-                QMessageBox.warning(self, "提示", "请先导入图片！")
-                return
-            out_dir = self.output_dir_edit.text().strip()
-            if not out_dir or not os.path.isdir(out_dir):
-                QMessageBox.warning(self, "提示", "请先选择有效的输出文件夹！")
-                return
-            prefix = self.naming_prefix.text()
-            suffix = self.naming_suffix.text()
-            fmt = "JPEG" if self.format_group.checkedId() == 0 else "PNG"
-            quality = self.quality_slider.value() if fmt == "JPEG" else None
-            resize_mode = self.resize_mode_combo.currentIndex()
-            resize_value = self.resize_value.text().strip()
-            from watermark.watermark_util import add_watermark
-            import traceback
-            total = len(self.image_list)
-            self.progress_bar.setEnabled(True)
-            self.progress_bar.setRange(0, total)
-            self.progress_bar.setValue(0)
-            for idx, path in enumerate(self.image_list, 1):
-                try:
-                    base = os.path.basename(path)
-                    name, ext = os.path.splitext(base)
-                    out_name = f"{prefix}{name}{suffix}.{fmt.lower()}"
-                    out_path = os.path.join(out_dir, out_name)
-                    # 获取水印参数
-                    (
-                        text, font, font_size, bold, italic, color, opacity, position,
-                        imgwm, imgwm_opacity, imgwm_scale
-                    ) = self.get_current_watermark_params()
-                    img = add_watermark(
-                        path, text,
-                        font=font, font_size=font_size, bold=bold, italic=italic, color=color,
-                        opacity=opacity, position=position,
-                        img_watermark_path=imgwm if imgwm else None,
-                        imgwm_opacity=imgwm_opacity, imgwm_scale=imgwm_scale
-                    )
-                    # 尺寸缩放
-                    if resize_mode > 0 and resize_value:
-                        try:
-                            if resize_mode == 1:  # 按宽度
-                                w = int(resize_value)
-                                h = int(img.height * w / img.width)
-                                img = img.resize((w, int(h)), Image.LANCZOS)
-                            elif resize_mode == 2:  # 按高度
-                                h = int(resize_value)
-                                w = int(img.width * h / img.height)
-                                img = img.resize((int(w), h), Image.LANCZOS)
-                            elif resize_mode == 3:  # 按百分比
-                                scale = float(resize_value) / 100.0
-                                w = int(img.width * scale)
-                                h = int(img.height * scale)
-                                img = img.resize((w, h), Image.LANCZOS)
-                        except Exception:
-                            pass
-                    # 保存
-                    save_kwargs = {}
-                    if fmt == "JPEG":
-                        save_kwargs["quality"] = quality
-                        save_kwargs["subsampling"] = 0
-                    img.save(out_path, fmt, **save_kwargs)
-                except Exception as e:
-                    print(f"导出失败: {path}\n{traceback.format_exc()}")
-                self.progress_bar.setValue(idx)
-            self.progress_bar.setEnabled(False)
-            QMessageBox.information(self, "完成", "批量导出完成！")
-        self.add_images(files)
+        if folder:
+            # 支持常见图片格式
+            exts = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff')
+            files = [os.path.join(folder, f) for f in os.listdir(folder) if f.lower().endswith(exts)]
+            self.add_images(files)
 
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    win = WatermarkMainWindow()
-    win.show()
-    sys.exit(app.exec_())
+    def export_images(self):
+        if not self.image_list:
+            QMessageBox.warning(self, "提示", "请先导入图片！")
+            return
+        out_dir = self.output_dir_edit.text().strip()
+        if not out_dir or not os.path.isdir(out_dir):
+            QMessageBox.warning(self, "提示", "请先选择有效的输出文件夹！")
+            return
+        prefix = self.naming_prefix.text()
+        suffix = self.naming_suffix.text()
+        fmt = "JPEG" if self.format_group.checkedId() == 0 else "PNG"
+        quality = self.quality_slider.value() if fmt == "JPEG" else None
+        resize_mode = self.resize_mode_combo.currentIndex()
+        resize_value = self.resize_value.text().strip()
+        from watermark.watermark_util import add_watermark
+        import traceback
+        total = len(self.image_list)
+        self.progress_bar.setEnabled(True)
+        self.progress_bar.setRange(0, total)
+        self.progress_bar.setValue(0)
+        for idx, path in enumerate(self.image_list, 1):
+            try:
+                base = os.path.basename(path)
+                name, ext = os.path.splitext(base)
+                out_name = f"{prefix}{name}{suffix}.{fmt.lower()}"
+                out_path = os.path.join(out_dir, out_name)
+                # 获取水印参数
+                (
+                    text, font, font_size, bold, italic, color, opacity, rotate, position,
+                    imgwm, imgwm_opacity, imgwm_scale
+                ) = self.get_current_watermark_params()
+                img = add_watermark(
+                    path, text,
+                    font=font, font_size=font_size, bold=bold, italic=italic, color=color,
+                    opacity=opacity, rotate=rotate, position=position,
+                    img_watermark_path=imgwm if imgwm else None,
+                    imgwm_opacity=imgwm_opacity, imgwm_scale=imgwm_scale
+                )
+                # 尺寸缩放
+                if resize_mode > 0 and resize_value:
+                    try:
+                        if resize_mode == 1:  # 按宽度
+                            w = int(resize_value)
+                            h = int(img.height * w / img.width)
+                            img = img.resize((w, int(h)), Image.LANCZOS)
+                        elif resize_mode == 2:  # 按高度
+                            h = int(resize_value)
+                            w = int(img.width * h / img.height)
+                            img = img.resize((int(w), h), Image.LANCZOS)
+                        elif resize_mode == 3:  # 按百分比
+                            scale = float(resize_value) / 100.0
+                            w = int(img.width * scale)
+                            h = int(img.height * scale)
+                            img = img.resize((w, h), Image.LANCZOS)
+                    except Exception:
+                        pass
+                # 保存
+                save_kwargs = {}
+                if fmt == "JPEG":
+                    save_kwargs["quality"] = quality
+                    save_kwargs["subsampling"] = 0
+                img.save(out_path, fmt, **save_kwargs)
+            except Exception as e:
+                print(f"导出失败: {path}\n{traceback.format_exc()}")
+            self.progress_bar.setValue(idx)
+        self.progress_bar.setEnabled(False)
+        QMessageBox.information(self, "完成", "批量导出完成！")
