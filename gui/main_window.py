@@ -107,6 +107,187 @@ class WatermarkMainWindow(QMainWindow):
         btn_export.clicked.connect(self.export_images)
         right_layout.addWidget(btn_export)
 
+        # 模板管理区
+        template_group = QGroupBox("水印模板管理")
+        template_layout = QHBoxLayout()
+        self.template_combo = QComboBox()
+        self.load_templates()
+        btn_save_tpl = QPushButton("保存模板")
+        btn_save_tpl.clicked.connect(self.save_template)
+        btn_load_tpl = QPushButton("加载模板")
+        btn_load_tpl.clicked.connect(self.load_selected_template)
+        btn_del_tpl = QPushButton("删除模板")
+        btn_del_tpl.clicked.connect(self.delete_selected_template)
+        template_layout.addWidget(self.template_combo)
+        template_layout.addWidget(btn_save_tpl)
+        template_layout.addWidget(btn_load_tpl)
+        template_layout.addWidget(btn_del_tpl)
+        template_group.setLayout(template_layout)
+        right_layout.addWidget(template_group)
+
+        # 自动加载上次设置
+        self.load_last_template()
+
+        main_layout.addLayout(right_layout, 5)
+
+    def get_template_path(self):
+        import os
+        return os.path.join(os.path.expanduser("~"), ".watermark_templates.json")
+
+    def load_templates(self):
+        import json
+        self.templates = {}
+        path = self.get_template_path()
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                self.templates = json.load(f)
+        self.template_combo.clear()
+        self.template_combo.addItems(self.templates.keys())
+
+    def save_template(self):
+        import json
+        name, ok = QFileDialog.getSaveFileName(self, "模板名", "", "*.tpl")
+        if not ok or not name:
+            return
+        tpl = {
+            "text": self.text_input.text(),
+            "opacity": self.opacity_slider.value(),
+            "position": self.position_combo.currentIndex(),
+            "prefix": self.naming_prefix.text(),
+            "suffix": self.naming_suffix.text(),
+            "format": self.format_group.checkedId()
+        }
+        self.templates[os.path.basename(name)] = tpl
+        with open(self.get_template_path(), "w", encoding="utf-8") as f:
+            json.dump(self.templates, f, ensure_ascii=False, indent=2)
+        self.load_templates()
+
+    def load_selected_template(self):
+        name = self.template_combo.currentText()
+        if not name or name not in self.templates:
+            return
+        tpl = self.templates[name]
+        self.text_input.setText(tpl.get("text", ""))
+        self.opacity_slider.setValue(tpl.get("opacity", 60))
+        self.position_combo.setCurrentIndex(tpl.get("position", 2))
+        self.naming_prefix.setText(tpl.get("prefix", "wm_"))
+        self.naming_suffix.setText(tpl.get("suffix", ""))
+        fmt = tpl.get("format", 0)
+        self.format_group.button(fmt).setChecked(True)
+        self.update_preview()
+
+    def delete_selected_template(self):
+        name = self.template_combo.currentText()
+        if not name or name not in self.templates:
+            return
+        del self.templates[name]
+        with open(self.get_template_path(), "w", encoding="utf-8") as f:
+            import json
+            json.dump(self.templates, f, ensure_ascii=False, indent=2)
+        self.load_templates()
+
+    def load_last_template(self):
+        # 启动时自动加载第一个模板
+        if hasattr(self, "templates") and self.templates:
+            self.template_combo.setCurrentIndex(0)
+            self.load_selected_template()
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Watermark 批量水印工具")
+        self.setGeometry(200, 200, 1000, 700)
+
+        self.image_list = []  # 存储图片路径
+
+        # 主布局
+        main_widget = QWidget()
+        main_layout = QHBoxLayout()
+        main_widget.setLayout(main_layout)
+        self.setCentralWidget(main_widget)
+
+        # 左侧：图片列表
+        left_layout = QVBoxLayout()
+        self.list_widget = QListWidget()
+        self.list_widget.setIconSize(Qt.QSize(100, 100))
+        self.list_widget.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.list_widget.itemSelectionChanged.connect(self.on_image_selected)
+        left_layout.addWidget(QLabel("已导入图片："))
+        left_layout.addWidget(self.list_widget)
+
+        btn_layout = QHBoxLayout()
+        btn_import = QPushButton("导入图片")
+        btn_import.clicked.connect(self.import_images)
+        btn_folder = QPushButton("导入文件夹")
+        btn_folder.clicked.connect(self.import_folder)
+        btn_delete = QPushButton("删除选中")
+        btn_delete.clicked.connect(self.delete_selected)
+        btn_layout.addWidget(btn_import)
+        btn_layout.addWidget(btn_folder)
+        btn_layout.addWidget(btn_delete)
+        left_layout.addLayout(btn_layout)
+
+        main_layout.addLayout(left_layout, 2)
+
+        # 右侧：预览区 + 水印参数设置
+        right_layout = QVBoxLayout()
+        self.preview_label = QLabel("预览区")
+        self.preview_label.setAlignment(Qt.AlignCenter)
+        right_layout.addWidget(self.preview_label)
+
+        # 水印参数设置区
+        from PyQt5.QtWidgets import QLineEdit, QSlider, QComboBox, QFormLayout, QGroupBox, QRadioButton, QButtonGroup, QMessageBox
+        param_layout = QFormLayout()
+        # 文本内容
+        self.text_input = QLineEdit("Watermark")
+        self.text_input.textChanged.connect(self.update_preview)
+        param_layout.addRow("水印文本：", self.text_input)
+        # 透明度
+        self.opacity_slider = QSlider(Qt.Horizontal)
+        self.opacity_slider.setRange(0, 100)
+        self.opacity_slider.setValue(60)
+        self.opacity_slider.valueChanged.connect(self.update_preview)
+        param_layout.addRow("透明度：", self.opacity_slider)
+        # 位置
+        self.position_combo = QComboBox()
+        self.position_combo.addItems(["左上", "居中", "右下"])
+        self.position_combo.currentIndexChanged.connect(self.update_preview)
+        param_layout.addRow("位置：", self.position_combo)
+        right_layout.addLayout(param_layout)
+
+        # 导出设置区
+        export_group = QGroupBox("导出设置")
+        export_layout = QFormLayout()
+        # 输出文件夹
+        self.output_dir_edit = QLineEdit()
+        btn_choose_dir = QPushButton("选择...")
+        btn_choose_dir.clicked.connect(self.choose_output_dir)
+        dir_layout = QHBoxLayout()
+        dir_layout.addWidget(self.output_dir_edit)
+        dir_layout.addWidget(btn_choose_dir)
+        export_layout.addRow("输出文件夹：", dir_layout)
+        # 命名规则
+        self.naming_prefix = QLineEdit("wm_")
+        self.naming_suffix = QLineEdit("")
+        export_layout.addRow("前缀：", self.naming_prefix)
+        export_layout.addRow("后缀：", self.naming_suffix)
+        # 输出格式
+        self.format_group = QButtonGroup()
+        radio_jpg = QRadioButton("JPEG")
+        radio_png = QRadioButton("PNG")
+        self.format_group.addButton(radio_jpg, 0)
+        self.format_group.addButton(radio_png, 1)
+        radio_jpg.setChecked(True)
+        fmt_layout = QHBoxLayout()
+        fmt_layout.addWidget(radio_jpg)
+        fmt_layout.addWidget(radio_png)
+        export_layout.addRow("输出格式：", fmt_layout)
+        export_group.setLayout(export_layout)
+        right_layout.addWidget(export_group)
+
+        # 导出按钮
+        btn_export = QPushButton("批量导出水印图片")
+        btn_export.clicked.connect(self.export_images)
+        right_layout.addWidget(btn_export)
+
         main_layout.addLayout(right_layout, 5)
 
     def choose_output_dir(self):
