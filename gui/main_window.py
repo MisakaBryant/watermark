@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QListWidget, QListWidgetItem, QFileDialog, QLabel, QAbstractItemView,
     QLineEdit, QSlider, QComboBox, QFormLayout, QGroupBox, QRadioButton, QButtonGroup, QMessageBox
+    , QFontComboBox, QColorDialog, QSpinBox, QCheckBox
 )
 from PyQt5.QtGui import QPixmap, QIcon
 from PyQt5.QtCore import Qt
@@ -54,12 +55,34 @@ class WatermarkMainWindow(QMainWindow):
         right_layout.addWidget(self.preview_label)
 
         # 水印参数设置区
-    # ...已在文件顶部导入所需 PyQt5 组件...
         param_layout = QFormLayout()
         # 文本内容
         self.text_input = QLineEdit("Watermark")
         self.text_input.textChanged.connect(self.update_preview)
         param_layout.addRow("水印文本：", self.text_input)
+        # 字体
+        self.font_combo = QFontComboBox()
+        self.font_combo.currentFontChanged.connect(self.update_preview)
+        param_layout.addRow("字体：", self.font_combo)
+        # 字号
+        self.font_size_spin = QSpinBox()
+        self.font_size_spin.setRange(8, 128)
+        self.font_size_spin.setValue(32)
+        self.font_size_spin.valueChanged.connect(self.update_preview)
+        param_layout.addRow("字号：", self.font_size_spin)
+        # 粗体
+        self.bold_check = QCheckBox("粗体")
+        self.bold_check.stateChanged.connect(self.update_preview)
+        param_layout.addRow(self.bold_check)
+        # 斜体
+        self.italic_check = QCheckBox("斜体")
+        self.italic_check.stateChanged.connect(self.update_preview)
+        param_layout.addRow(self.italic_check)
+        # 颜色
+        self.color_btn = QPushButton("选择颜色")
+        self.color_btn.clicked.connect(self.choose_text_color)
+        self.text_color = "#FFFFFF"
+        param_layout.addRow("字体颜色：", self.color_btn)
         # 透明度
         self.opacity_slider = QSlider(Qt.Horizontal)
         self.opacity_slider.setRange(0, 100)
@@ -72,6 +95,12 @@ class WatermarkMainWindow(QMainWindow):
         self.position_combo.currentIndexChanged.connect(self.update_preview)
         param_layout.addRow("位置：", self.position_combo)
         right_layout.addLayout(param_layout)
+
+    def choose_text_color(self):
+        color = QColorDialog.getColor()
+        if color.isValid():
+            self.text_color = color.name()
+            self.update_preview()
 
         # 图片水印设置区
         imgwm_group = QGroupBox("图片水印（可选）")
@@ -305,13 +334,18 @@ class WatermarkMainWindow(QMainWindow):
     # ...existing code...
     def get_current_watermark_params(self):
         text = self.text_input.text()
+        font = self.font_combo.currentFont().family()
+        font_size = self.font_size_spin.value()
+        bold = self.bold_check.isChecked()
+        italic = self.italic_check.isChecked()
+        color = self.text_color
         opacity = self.opacity_slider.value()
         pos_map = {0: "left_top", 1: "center", 2: "right_bottom"}
         position = pos_map.get(self.position_combo.currentIndex(), "right_bottom")
         imgwm = self.imgwm_path.text().strip()
         imgwm_opacity = self.imgwm_opacity.value()
         imgwm_scale = self.imgwm_scale.value()
-        return text, opacity, position, imgwm, imgwm_opacity, imgwm_scale
+        return text, font, font_size, bold, italic, color, opacity, position, imgwm, imgwm_opacity, imgwm_scale
 
     def update_preview(self):
         selected = self.list_widget.selectedItems()
@@ -326,10 +360,15 @@ class WatermarkMainWindow(QMainWindow):
             return
         # 应用水印
         from watermark.watermark_util import add_watermark
-        text, opacity, position, imgwm, imgwm_opacity, imgwm_scale = self.get_current_watermark_params()
+        (
+            text, font, font_size, bold, italic, color, opacity, position,
+            imgwm, imgwm_opacity, imgwm_scale
+        ) = self.get_current_watermark_params()
         try:
             watermarked = add_watermark(
-                img_path, text, opacity=opacity, position=position,
+                img_path, text,
+                font=font, font_size=font_size, bold=bold, italic=italic, color=color,
+                opacity=opacity, position=position,
                 img_watermark_path=imgwm if imgwm else None,
                 imgwm_opacity=imgwm_opacity, imgwm_scale=imgwm_scale
             )
@@ -354,62 +393,67 @@ class WatermarkMainWindow(QMainWindow):
 
     def import_folder(self):
         folder = QFileDialog.getExistingDirectory(self, "选择文件夹")
-        if folder:
-            exts = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff')
-            files = [os.path.join(folder, f) for f in os.listdir(folder)
-                     if f.lower().endswith(exts)]
-            self.add_images(files)
-
-    def add_images(self, files):
-        exts = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff')
-        for f in files:
-            if not f.lower().endswith(exts):
-                continue
-            if f not in self.image_list and os.path.isfile(f):
-                self.image_list.append(f)
-                item = QListWidgetItem(os.path.basename(f))
-                item.setData(Qt.UserRole, f)
-                thumb = self.make_thumbnail(f)
-                if thumb:
-                    item.setIcon(QIcon(thumb))
-                self.list_widget.addItem(item)
-
-    def make_thumbnail(self, path):
-        try:
-            img = Image.open(path)
-            img.thumbnail((100, 100))
-            thumb_path = path + ".thumb.jpg"
-            img.save(thumb_path, "JPEG")
-            return thumb_path
-        except Exception:
-            return None
-
-    def on_image_selected(self):
-        self.update_preview()
-
-    def delete_selected(self):
-        selected = self.list_widget.selectedItems()
-        for item in selected:
-            row = self.list_widget.row(item)
-            img_path = item.data(Qt.UserRole)
-            if img_path in self.image_list:
-                self.image_list.remove(img_path)
-            self.list_widget.takeItem(row)
-        self.on_image_selected()
-
-    def dragEnterEvent(self, event):
-        if event.mimeData().hasUrls():
-            event.acceptProposedAction()
-
-    def dropEvent(self, event):
-        files = []
-        for url in event.mimeData().urls():
-            f = url.toLocalFile()
-            if os.path.isdir(f):
-                exts = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff')
-                files += [os.path.join(f, x) for x in os.listdir(f) if x.lower().endswith(exts)]
-            elif os.path.isfile(f):
-                files.append(f)
+        def export_images(self):
+            if not self.image_list:
+                QMessageBox.warning(self, "提示", "请先导入图片！")
+                return
+            out_dir = self.output_dir_edit.text().strip()
+            if not out_dir or not os.path.isdir(out_dir):
+                QMessageBox.warning(self, "提示", "请先选择有效的输出文件夹！")
+                return
+            prefix = self.naming_prefix.text()
+            suffix = self.naming_suffix.text()
+            fmt = "JPEG" if self.format_group.checkedId() == 0 else "PNG"
+            quality = self.quality_slider.value() if fmt == "JPEG" else None
+            resize_mode = self.resize_mode_combo.currentIndex()
+            resize_value = self.resize_value.text().strip()
+            from watermark.watermark_util import add_watermark
+            import traceback
+            for path in self.image_list:
+                try:
+                    base = os.path.basename(path)
+                    name, ext = os.path.splitext(base)
+                    out_name = f"{prefix}{name}{suffix}.{fmt.lower()}"
+                    out_path = os.path.join(out_dir, out_name)
+                    # 获取水印参数
+                    (
+                        text, font, font_size, bold, italic, color, opacity, position,
+                        imgwm, imgwm_opacity, imgwm_scale
+                    ) = self.get_current_watermark_params()
+                    img = add_watermark(
+                        path, text,
+                        font=font, font_size=font_size, bold=bold, italic=italic, color=color,
+                        opacity=opacity, position=position,
+                        img_watermark_path=imgwm if imgwm else None,
+                        imgwm_opacity=imgwm_opacity, imgwm_scale=imgwm_scale
+                    )
+                    # 尺寸缩放
+                    if resize_mode > 0 and resize_value:
+                        try:
+                            if resize_mode == 1:  # 按宽度
+                                w = int(resize_value)
+                                h = int(img.height * w / img.width)
+                                img = img.resize((w, int(h)), Image.LANCZOS)
+                            elif resize_mode == 2:  # 按高度
+                                h = int(resize_value)
+                                w = int(img.width * h / img.height)
+                                img = img.resize((int(w), h), Image.LANCZOS)
+                            elif resize_mode == 3:  # 按百分比
+                                scale = float(resize_value) / 100.0
+                                w = int(img.width * scale)
+                                h = int(img.height * scale)
+                                img = img.resize((w, h), Image.LANCZOS)
+                        except Exception:
+                            pass
+                    # 保存
+                    save_kwargs = {}
+                    if fmt == "JPEG":
+                        save_kwargs["quality"] = quality
+                        save_kwargs["subsampling"] = 0
+                    img.save(out_path, fmt, **save_kwargs)
+                except Exception as e:
+                    print(f"导出失败: {path}\n{traceback.format_exc()}")
+            QMessageBox.information(self, "完成", "批量导出完成！")
         self.add_images(files)
 
 if __name__ == "__main__":

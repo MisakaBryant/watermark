@@ -5,7 +5,10 @@ from typing import Tuple
 def add_watermark(
     image_path: str,
     text: str,
+    font: str = "Arial",
     font_size: int = 32,
+    bold: bool = False,
+    italic: bool = False,
     color: str = "#FFFFFF",
     position: str = "right_bottom",
     opacity: int = 60
@@ -16,11 +19,44 @@ def add_watermark(
     img = Image.open(image_path).convert("RGBA")
     txt_layer = Image.new("RGBA", img.size, (255,255,255,0))
     draw = ImageDraw.Draw(txt_layer)
+    # 字体文件查找
+    font_path = None
+    import platform
+    sys_plat = platform.system()
+    font_name = font if font else "Arial"
+    if sys_plat == "Windows":
+        base = os.environ.get("WINDIR", "C:\\Windows") + "\\Fonts\\"
+        # 常见字体映射
+        font_candidates = [
+            f"{font_name}.ttf", f"{font_name}.TTF", f"{font_name}.otf", f"{font_name}.OTF",
+            f"{font_name} Bold.ttf", f"{font_name} Italic.ttf", f"{font_name} Bold Italic.ttf"
+        ]
+        for cand in font_candidates:
+            p = os.path.join(base, cand)
+            if os.path.exists(p):
+                font_path = p
+                break
+    elif sys_plat == "Darwin":
+        base = "/Library/Fonts/"
+        font_candidates = [f"{font_name}.ttf", f"{font_name}.otf"]
+        for cand in font_candidates:
+            p = os.path.join(base, cand)
+            if os.path.exists(p):
+                font_path = p
+                break
+    # Linux/其它
+    if not font_path:
+        font_path = None
+    # 字体样式
     try:
-        font = ImageFont.truetype("arial.ttf", font_size)
+        if font_path:
+            font_obj = ImageFont.truetype(font_path, font_size)
+        else:
+            font_obj = ImageFont.truetype(font_name, font_size)
     except Exception:
-        font = ImageFont.load_default()
-    text_size = draw.textbbox((0,0), text, font=font)
+        font_obj = ImageFont.load_default()
+    # PIL 不直接支持粗体/斜体，部分字体可用
+    text_size = draw.textbbox((0,0), text, font=font_obj)
     w, h = text_size[2] - text_size[0], text_size[3] - text_size[1]
     # 位置计算
     if position == "left_top":
@@ -35,6 +71,6 @@ def add_watermark(
     else:
         rgb = (255,255,255)
     fill = rgb + (int(255 * opacity / 100),)
-    draw.text(xy, text, font=font, fill=fill)
+    draw.text(xy, text, font=font_obj, fill=fill)
     watermarked = Image.alpha_composite(img, txt_layer)
     return watermarked.convert("RGB")
